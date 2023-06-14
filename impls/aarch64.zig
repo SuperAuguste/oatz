@@ -88,7 +88,7 @@ pub fn init(
             fib.allocator.destroy(wc);
             @call(.auto, wcd.func, wcd.args);
 
-            fib.yield() catch @panic("Could not switchTo back to original stack");
+            fib.yield();
         }
     };
 
@@ -129,9 +129,9 @@ pub fn switchTo(allocator: std.mem.Allocator, ctx: *Context) Error!void {
     oatz_arm64_switchTo(&ctx.caller_ctx, &ctx.fiber_ctx);
 }
 
-pub fn yield(allocator: std.mem.Allocator, ctx: *Context) Error!void {
+pub fn yield(allocator: std.mem.Allocator, ctx: *Context) void {
     _ = allocator;
     if (ctx.caller_ctx.resumable == 0)
-        return error.NotResumable;
+        @panic("Caller not resumable!");
     oatz_arm64_switchTo(&ctx.fiber_ctx, &ctx.caller_ctx);
 }

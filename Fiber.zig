@@ -5,7 +5,7 @@ const Fiber = @import("Fiber.zig");
 
 /// There is no reason to do this other than
 /// a lack of arch support - please don't use this
-const use_ucontext = std.meta.globalOption("oatz_use_ucontext", bool) orelse true;
+const use_ucontext = std.meta.globalOption("oatz_use_ucontext", bool) orelse false;
 const not_supported_message = "Not supported; please open an issue or see oatz_use_context";
 
 const impl = if (use_ucontext) @import("impls/ucontext.zig") else switch (builtin.cpu.arch) {
@@ -76,15 +76,15 @@ pub fn switchTo(fiber: *Fiber) Error!void {
     current = s;
 }
 
-pub fn yield(fiber: *Fiber) Error!void {
-    try impl.yield(fiber.allocator, &fiber.context);
+pub fn yield(fiber: *Fiber) void {
+    impl.yield(fiber.allocator, &fiber.context);
 }
 
 fn hello(num: usize, other_fiber: *Fiber) void {
     std.debug.print("\n\nHi from hello 1: {*}!\n\n", .{current});
     other_fiber.switchTo() catch @panic("bruh1");
     std.debug.print("\n\nHi from hello 1: {*}!\n\n", .{current});
-    current.?.yield() catch @panic("bruh2");
+    current.?.yield();
     std.debug.print("\n\nHi from hello 2: {d}!\n\n", .{num});
 }
 

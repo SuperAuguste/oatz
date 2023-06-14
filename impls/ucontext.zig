@@ -102,10 +102,10 @@ pub fn switchTo(allocator: std.mem.Allocator, ctx: *Context) Error!void {
     }
 }
 
-pub fn yield(allocator: std.mem.Allocator, ctx: *Context) Error!void {
+pub fn yield(allocator: std.mem.Allocator, ctx: *Context) void {
     _ = allocator;
     var sc_err = std.c.getErrno(swapcontext(ctx.ucp, ctx.oucp));
     if (sc_err != .SUCCESS) {
-        return std.os.unexpectedErrno(sc_err);
+        std.debug.panic("Could not resume caller; {any}", .{sc_err});
     }
 }
