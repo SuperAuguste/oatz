@@ -64,20 +64,31 @@ pub fn destroy(fiber: *Fiber) void {
     fiber.allocator.destroy(fiber);
 }
 
+pub threadlocal var current_fiber: ?*Fiber = null;
+
 pub fn swap(fiber: *Fiber) Error!void {
-    return impl.swap(fiber.allocator, &fiber.context);
+    const s = current_fiber;
+    current_fiber = fiber;
+
+    try impl.swap(fiber.allocator, &fiber.context);
+
+    current_fiber = s;
 }
 
 pub fn swapBack(fiber: *Fiber) Error!void {
-    return impl.swapBack(fiber.allocator, &fiber.context);
+    try impl.swapBack(fiber.allocator, &fiber.context);
 }
 
 fn hello(num: usize, other_fiber: *Fiber) void {
-    other_fiber.swap() catch @panic("bruh");
-    std.debug.print("\n\nHi from fiber 1: {d}!\n\n", .{num});
+    std.debug.print("\n\nHi from hello 1: {*}!\n\n", .{current_fiber});
+    other_fiber.swap() catch @panic("bruh1");
+    std.debug.print("\n\nHi from hello 1: {*}!\n\n", .{current_fiber});
+    current_fiber.?.swapBack() catch @panic("bruh2");
+    std.debug.print("\n\nHi from hello 2: {d}!\n\n", .{num});
 }
 
 fn hello2(num: usize) void {
+    std.debug.print("\n\nHi from hello 222: {*}!\n\n", .{current_fiber});
     std.debug.print("\n\nHi from fiber 2: {d}!\n\n", .{num});
 }
 
@@ -92,5 +103,7 @@ test {
 
     std.debug.print("\n\nHi from og stack 1 {*}\n\n", .{fiber});
     try fiber.swap();
-    std.debug.print("\n\nHi from og stack 2\n\n", .{});
+    std.debug.print("\n\nHi from og stack 2 {any}\n\n", .{current_fiber});
+    try fiber.swap();
+    std.debug.print("\n\nHi from og stack 3 {any}\n\n", .{current_fiber});
 }

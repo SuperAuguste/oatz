@@ -52,8 +52,8 @@ pub const Error = error{
 
 pub const Context = struct {
     stack: []const usize,
-    current_ctx: InternalContext,
-    new_ctx: InternalContext,
+    caller_ctx: InternalContext,
+    fiber_ctx: InternalContext,
 
     func_and_args: *anyopaque,
 };
@@ -101,8 +101,8 @@ pub fn init(
 
     var stack = try allocator.allocWithOptions(usize, @divTrunc(stack_size, @sizeOf(usize)), 16, null);
 
-    var current_ctx: InternalContext = undefined;
-    var new_ctx = InternalContext{
+    var caller_ctx: InternalContext = undefined;
+    var fiber_ctx = InternalContext{
         .stack_top = stack.ptr + stack.len - 22,
         .resumable = 1,
     };
@@ -112,8 +112,8 @@ pub fn init(
 
     fiber.context = .{
         .stack = stack,
-        .current_ctx = current_ctx,
-        .new_ctx = new_ctx,
+        .caller_ctx = caller_ctx,
+        .fiber_ctx = fiber_ctx,
 
         .func_and_args = wrapped_caller,
     };
@@ -125,14 +125,14 @@ pub fn deinit(allocator: std.mem.Allocator, ctx: *Context) void {
 
 pub fn swap(allocator: std.mem.Allocator, ctx: *Context) Error!void {
     _ = allocator;
-    if (ctx.new_ctx.resumable == 0)
+    if (ctx.fiber_ctx.resumable == 0)
         return error.NotResumable;
-    otaz_arm64_swap(&ctx.current_ctx, &ctx.new_ctx);
+    otaz_arm64_swap(&ctx.caller_ctx, &ctx.fiber_ctx);
 }
 
 pub fn swapBack(allocator: std.mem.Allocator, ctx: *Context) Error!void {
     _ = allocator;
-    if (ctx.current_ctx.resumable == 0)
+    if (ctx.caller_ctx.resumable == 0)
         return error.NotResumable;
-    otaz_arm64_swap(&ctx.new_ctx, &ctx.current_ctx);
+    otaz_arm64_swap(&ctx.fiber_ctx, &ctx.caller_ctx);
 }
