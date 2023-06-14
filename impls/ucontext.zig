@@ -1,4 +1,5 @@
 const std = @import("std");
+const Fiber = @import("../Fiber.zig");
 
 const c = @cImport({
     @cDefine("_XOPEN_SOURCE", "");
@@ -27,11 +28,13 @@ pub const Context = struct {
 
 pub fn init(
     comptime Fn: type,
-    allocator: std.mem.Allocator,
+    fiber: *Fiber,
     stack_size: usize,
     func: anytype,
     args: anytype,
-) Error!Context {
+) Error!void {
+    const allocator = fiber.allocator;
+
     var ucp = try allocator.create(ucontext_t);
     var oucp = try allocator.create(ucontext_t);
 
@@ -71,7 +74,7 @@ pub fn init(
 
     makecontext(ucp, &run, 4, func_01[0], func_01[1], args_01[0], args_01[1]);
 
-    return .{
+    fiber.context = .{
         .oucp = oucp,
         .ucp = ucp,
         .stack = stack,
@@ -84,16 +87,24 @@ pub fn init(
     };
 }
 
-pub fn deinit(allocator: std.mem.Allocator, ctx: Context) void {
+pub fn deinit(allocator: std.mem.Allocator, ctx: *Context) void {
     allocator.destroy(ctx.oucp);
     allocator.destroy(ctx.ucp);
     ctx.free(allocator, ctx.args);
     allocator.free(ctx.stack);
 }
 
-pub fn swap(allocator: std.mem.Allocator, ctx: Context) Error!void {
+pub fn switchTo(allocator: std.mem.Allocator, ctx: *Context) Error!void {
     _ = allocator;
     var sc_err = std.c.getErrno(swapcontext(ctx.oucp, ctx.ucp));
+    if (sc_err != .SUCCESS) {
+        return std.os.unexpectedErrno(sc_err);
+    }
+}
+
+pub fn yield(allocator: std.mem.Allocator, ctx: *Context) Error!void {
+    _ = allocator;
+    var sc_err = std.c.getErrno(swapcontext(ctx.ucp, ctx.oucp));
     if (sc_err != .SUCCESS) {
         return std.os.unexpectedErrno(sc_err);
     }

@@ -1,9 +1,10 @@
 const std = @import("std");
+const Fiber = @import("../Fiber.zig");
 
 comptime {
     asm (
-        \\.global _otaz_arm64_swap
-        \\_otaz_arm64_swap:
+        \\.global _oatz_arm64_switchTo
+        \\_oatz_arm64_switchTo:
         \\    stp     d15, d14, [sp, #-22*8]!
         \\    stp     d13, d12, [sp, #2*8]
         \\    stp     d11, d10, [sp, #4*8]
@@ -64,9 +65,7 @@ pub const InternalContext = extern struct {
     registers: [20]usize = undefined,
 };
 
-pub extern fn otaz_arm64_swap(current_context: *InternalContext, new_context: *InternalContext) void;
-
-const Fiber = @import("../Fiber.zig");
+pub extern fn oatz_arm64_switchTo(current_context: *InternalContext, new_context: *InternalContext) void;
 
 pub fn init(
     comptime Fn: type,
@@ -89,7 +88,7 @@ pub fn init(
             fib.allocator.destroy(wc);
             @call(.auto, wcd.func, wcd.args);
 
-            fib.swapBack() catch @panic("Could not swap back to original stack");
+            fib.yield() catch @panic("Could not switchTo back to original stack");
         }
     };
 
@@ -123,16 +122,16 @@ pub fn deinit(allocator: std.mem.Allocator, ctx: *Context) void {
     allocator.free(ctx.stack);
 }
 
-pub fn swap(allocator: std.mem.Allocator, ctx: *Context) Error!void {
+pub fn switchTo(allocator: std.mem.Allocator, ctx: *Context) Error!void {
     _ = allocator;
     if (ctx.fiber_ctx.resumable == 0)
         return error.NotResumable;
-    otaz_arm64_swap(&ctx.caller_ctx, &ctx.fiber_ctx);
+    oatz_arm64_switchTo(&ctx.caller_ctx, &ctx.fiber_ctx);
 }
 
-pub fn swapBack(allocator: std.mem.Allocator, ctx: *Context) Error!void {
+pub fn yield(allocator: std.mem.Allocator, ctx: *Context) Error!void {
     _ = allocator;
     if (ctx.caller_ctx.resumable == 0)
         return error.NotResumable;
-    otaz_arm64_swap(&ctx.fiber_ctx, &ctx.caller_ctx);
+    oatz_arm64_switchTo(&ctx.fiber_ctx, &ctx.caller_ctx);
 }

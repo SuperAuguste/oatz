@@ -5,7 +5,7 @@ const Fiber = @import("Fiber.zig");
 
 /// There is no reason to do this other than
 /// a lack of arch support - please don't use this
-const use_ucontext = std.meta.globalOption("oatz_use_ucontext", bool) orelse false;
+const use_ucontext = std.meta.globalOption("oatz_use_ucontext", bool) orelse true;
 const not_supported_message = "Not supported; please open an issue or see oatz_use_context";
 
 const impl = if (use_ucontext) @import("impls/ucontext.zig") else switch (builtin.cpu.arch) {
@@ -64,31 +64,32 @@ pub fn destroy(fiber: *Fiber) void {
     fiber.allocator.destroy(fiber);
 }
 
-pub threadlocal var current_fiber: ?*Fiber = null;
+// NOTE: NEVER MODIFY THIS PLEASE USER
+pub threadlocal var current: ?*Fiber = null;
 
-pub fn swap(fiber: *Fiber) Error!void {
-    const s = current_fiber;
-    current_fiber = fiber;
+pub fn switchTo(fiber: *Fiber) Error!void {
+    const s = current;
+    current = fiber;
 
-    try impl.swap(fiber.allocator, &fiber.context);
+    try impl.switchTo(fiber.allocator, &fiber.context);
 
-    current_fiber = s;
+    current = s;
 }
 
-pub fn swapBack(fiber: *Fiber) Error!void {
-    try impl.swapBack(fiber.allocator, &fiber.context);
+pub fn yield(fiber: *Fiber) Error!void {
+    try impl.yield(fiber.allocator, &fiber.context);
 }
 
 fn hello(num: usize, other_fiber: *Fiber) void {
-    std.debug.print("\n\nHi from hello 1: {*}!\n\n", .{current_fiber});
-    other_fiber.swap() catch @panic("bruh1");
-    std.debug.print("\n\nHi from hello 1: {*}!\n\n", .{current_fiber});
-    current_fiber.?.swapBack() catch @panic("bruh2");
+    std.debug.print("\n\nHi from hello 1: {*}!\n\n", .{current});
+    other_fiber.switchTo() catch @panic("bruh1");
+    std.debug.print("\n\nHi from hello 1: {*}!\n\n", .{current});
+    current.?.yield() catch @panic("bruh2");
     std.debug.print("\n\nHi from hello 2: {d}!\n\n", .{num});
 }
 
 fn hello2(num: usize) void {
-    std.debug.print("\n\nHi from hello 222: {*}!\n\n", .{current_fiber});
+    std.debug.print("\n\nHi from hello 222: {*}!\n\n", .{current});
     std.debug.print("\n\nHi from fiber 2: {d}!\n\n", .{num});
 }
 
@@ -102,8 +103,8 @@ test {
     defer fiber.destroy();
 
     std.debug.print("\n\nHi from og stack 1 {*}\n\n", .{fiber});
-    try fiber.swap();
-    std.debug.print("\n\nHi from og stack 2 {any}\n\n", .{current_fiber});
-    try fiber.swap();
-    std.debug.print("\n\nHi from og stack 3 {any}\n\n", .{current_fiber});
+    try fiber.switchTo();
+    std.debug.print("\n\nHi from og stack 2 {any}\n\n", .{current});
+    try fiber.switchTo();
+    std.debug.print("\n\nHi from og stack 3 {any}\n\n", .{current});
 }
