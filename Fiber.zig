@@ -6,7 +6,6 @@ const Fiber = @import("Fiber.zig");
 /// There is no reason to do this other than
 /// a lack of arch support - please don't use this
 const use_ucontext = std.meta.globalOption("oatz_use_ucontext", bool) orelse false;
-const not_supported_message = "Not supported; please open an issue or see oatz_use_context";
 
 const impl = if (use_ucontext) @import("impls/ucontext.zig") else switch (builtin.cpu.arch) {
     .aarch64, .aarch64_be, .aarch64_32 => @import("impls/aarch64.zig"),
@@ -78,33 +77,4 @@ pub fn switchTo(fiber: *Fiber) Error!void {
 
 pub fn yield(fiber: *Fiber) void {
     impl.yield(fiber.allocator, &fiber.context);
-}
-
-fn hello(num: usize, other_fiber: *Fiber) void {
-    std.debug.print("\n\nHi from hello 1: {*}!\n\n", .{current});
-    other_fiber.switchTo() catch @panic("bruh1");
-    std.debug.print("\n\nHi from hello 1: {*}!\n\n", .{current});
-    current.?.yield();
-    std.debug.print("\n\nHi from hello 2: {d}!\n\n", .{num});
-}
-
-fn hello2(num: usize) void {
-    std.debug.print("\n\nHi from hello 222: {*}!\n\n", .{current});
-    std.debug.print("\n\nHi from fiber 2: {d}!\n\n", .{num});
-}
-
-test {
-    const allocator = std.testing.allocator;
-
-    var fiber2 = try Fiber.create(allocator, 16_384, hello2, .{69});
-    defer fiber2.destroy();
-
-    var fiber = try Fiber.create(allocator, 16_384, hello, .{ 123, fiber2 });
-    defer fiber.destroy();
-
-    std.debug.print("\n\nHi from og stack 1 {*}\n\n", .{fiber});
-    try fiber.switchTo();
-    std.debug.print("\n\nHi from og stack 2 {any}\n\n", .{current});
-    try fiber.switchTo();
-    std.debug.print("\n\nHi from og stack 3 {any}\n\n", .{current});
 }
